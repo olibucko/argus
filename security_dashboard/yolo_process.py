@@ -108,9 +108,6 @@ def yolo_worker_process(input_queue: mp.Queue, output_queue: mp.Queue,
 
     logger.info("YOLO worker process started and ready for inference")
 
-    # Track shared memory segments for cleanup
-    active_shm = {}
-
     # Main processing loop
     while True:
         try:
@@ -158,13 +155,6 @@ def yolo_worker_process(input_queue: mp.Queue, output_queue: mp.Queue,
             logger.error(f"Error in YOLO worker process: {e}")
             continue
 
-    # Cleanup any remaining shared memory references
-    for shm in active_shm.values():
-        try:
-            shm.close()
-        except:
-            pass
-
     logger.info("YOLO worker process terminated")
 
 
@@ -194,7 +184,6 @@ class YOLOProcessManager:
         # Performance tracking
         self.total_inferences = 0
         self.total_inference_time = 0.0
-        self.total_serialization_time = 0.0  # Track time saved
         
     def start_process(self):
         """Start the YOLO detection subprocess."""
