@@ -74,11 +74,6 @@ class FrameEntry:
                 self.priority == other.priority and
                 self.size_bytes == other.size_bytes)
 
-    def __hash__(self):
-        """Make FrameEntry hashable."""
-        return hash((self.timestamp, self.priority, self.size_bytes))
-
-
 class MemoryBoundedBuffer:
     """
     Memory-aware buffer that automatically evicts frames when memory limits are reached.
@@ -177,54 +172,6 @@ class MemoryBoundedBuffer:
             entry.last_access = time.time()
             return entry.get_frame_data()  # Handles both references and direct frames
 
-    def pop_latest_frame(self) -> Optional[np.ndarray]:
-        """Get and remove the most recent frame from the buffer."""
-        with self.lock:
-            if not self.frames:
-                return None
-
-            entry = self.frames.pop()
-            self.current_memory_usage -= entry.size_bytes
-
-            # Get frame data before releasing reference
-            frame_data = entry.get_frame_data()
-
-            # Release reference if applicable
-            entry.release()
-
-            return frame_data
-
-    def wait_and_pop_frame(self, timeout: float = 1.0) -> Optional[np.ndarray]:
-        """
-        Wait for a frame to become available and consume it (blocking with timeout).
-        This is the event-driven alternative to polling pop_latest_frame().
-
-        Args:
-            timeout: Maximum time to wait in seconds
-
-        Returns:
-            Frame if available, None if timeout
-        """
-        with self.frame_available:
-            # Wait for notification or timeout
-            if not self.frames:
-                self.frame_available.wait(timeout=timeout)
-
-            # Check again after waiting
-            if not self.frames:
-                return None
-
-            entry = self.frames.pop()
-            self.current_memory_usage -= entry.size_bytes
-
-            # Get frame data before releasing reference
-            frame_data = entry.get_frame_data()
-
-            # Release reference if applicable
-            entry.release()
-
-            return frame_data
-
     def wait_and_pop_entry(self, timeout: float = 1.0) -> Optional[FrameEntry]:
         """
         Wait for a frame entry to become available and consume it.
@@ -247,24 +194,6 @@ class MemoryBoundedBuffer:
             self.current_memory_usage -= entry.size_bytes
 
             return entry
-
-    def get_frame_history(self, max_frames: int = None) -> List[Tuple[np.ndarray, float]]:
-        """Get frame history as list of (frame, timestamp) tuples."""
-        with self.lock:
-            frames = list(self.frames)
-            if max_frames:
-                frames = frames[-max_frames:]
-
-            result = []
-            current_time = time.time()
-            for entry in frames:
-                entry.access_count += 1
-                entry.last_access = current_time
-                frame_data = entry.get_frame_data()
-                if frame_data is not None:
-                    result.append((frame_data, entry.timestamp))
-
-            return result
 
     def get_all_frames(self) -> List[np.ndarray]:
         """Get all frames in the buffer as a list (for video recording)."""

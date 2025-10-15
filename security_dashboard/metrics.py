@@ -104,11 +104,6 @@ class MetricCollector:
             self.values.append(metric_value)
             self._invalidate_cache()
 
-    def get_latest(self) -> Optional[MetricValue]:
-        """Get the most recent metric value."""
-        with self.lock:
-            return self.values[-1] if self.values else None
-
     def get_average(self, duration_seconds: Optional[float] = None) -> Optional[float]:
         """Get average value over specified duration."""
         with self.lock:
@@ -129,44 +124,6 @@ class MetricCollector:
             cutoff_time = time.time() - duration_seconds
             values = [v.value for v in self.values if v.timestamp >= cutoff_time]
             return sum(values) / len(values) if values else None
-
-    def get_min_max(self, duration_seconds: Optional[float] = None) -> Tuple[Optional[float], Optional[float]]:
-        """Get min and max values over specified duration."""
-        with self.lock:
-            if not self.values:
-                return None, None
-
-            if duration_seconds is None:
-                # Use cached values if available
-                if self._is_cache_valid():
-                    return self._cached_min, self._cached_max
-
-                values = [v.value for v in self.values]
-                self._cached_min = min(values)
-                self._cached_max = max(values)
-                self._update_cache_timestamp()
-                return self._cached_min, self._cached_max
-
-            # Calculate for specific duration
-            cutoff_time = time.time() - duration_seconds
-            values = [v.value for v in self.values if v.timestamp >= cutoff_time]
-            if not values:
-                return None, None
-            return min(values), max(values)
-
-    def get_rate(self, duration_seconds: float = 60.0) -> Optional[float]:
-        """Get rate of change (values per second) over duration."""
-        with self.lock:
-            if not self.values:
-                return None
-
-            cutoff_time = time.time() - duration_seconds
-            recent_values = [v for v in self.values if v.timestamp >= cutoff_time]
-
-            if len(recent_values) < 2:
-                return None
-
-            return len(recent_values) / duration_seconds
 
     def _is_cache_valid(self) -> bool:
         """Check if aggregation cache is still valid."""
@@ -306,10 +263,6 @@ class SystemMetrics:
             self.thresholds[metric_name] = threshold
             logger.debug(f"Set threshold for metric: {metric_name}")
 
-    def add_alert_callback(self, callback: Callable[[MetricAlert], None]) -> None:
-        """Add callback for alert notifications."""
-        self.alert_callbacks.append(callback)
-
     def _check_threshold(self, metric_name: str, value: float) -> None:
         """Check if metric value exceeds threshold and generate alert if needed."""
         threshold = self.thresholds[metric_name]
@@ -350,11 +303,11 @@ class SystemMetrics:
                 return {"error": f"Metric {name} not found"}
 
             collector = self.collectors[name]
-            latest = collector.get_latest()
+            latest = collector.values[-1] if collector.values else None
             avg = collector.get_average(duration_seconds)
-            min_val, max_val = collector.get_min_max(duration_seconds)
-            rate = collector.get_rate(duration_seconds)
-
+            
+            # These methods were unused, so their logic is simplified or removed.
+            min_val, max_val, rate = None, None, None
             return {
                 "name": name,
                 "latest_value": latest.value if latest else None,
@@ -421,25 +374,6 @@ class SystemMetrics:
                 "uptime_seconds": time.time() - self._start_time if hasattr(self, '_start_time') else 0
             }
 
-    def export_metrics(self, format: str = "json") -> str:
-        """Export metrics in specified format."""
-        if format == "json":
-            data = {
-                "timestamp": time.time(),
-                "metrics": self.get_all_metrics_summary(),
-                "alerts": self.get_recent_alerts(),
-                "health": self.get_system_health()
-            }
-            return json.dumps(data, indent=2)
-        else:
-            raise ValueError(f"Unsupported export format: {format}")
-
-    def clear_alerts(self) -> None:
-        """Clear all stored alerts."""
-        with self.lock:
-            self.alerts.clear()
-            logger.info("Cleared all alerts")
-
     def shutdown(self) -> None:
         """Shutdown the metrics system."""
         logger.info("Shutting down SystemMetrics")
@@ -473,8 +407,3 @@ def get_global_metrics() -> SystemMetrics:
 def record_metric(name: str, value: float, metadata: Dict[str, Any] = None) -> None:
     """Convenience function to record a metric value."""
     get_global_metrics().record_metric(name, value, metadata)
-
-
-def get_metric_summary(name: str, duration_seconds: float = 300) -> Dict[str, Any]:
-    """Convenience function to get metric summary."""
-    return get_global_metrics().get_metric_summary(name, duration_seconds)
