@@ -78,7 +78,7 @@
             background: radial-gradient(circle at center, transparent 30%, rgba(184, 134, 11, 0.1) 100%);
             pointer-events: none;
             opacity: 0.5;
-            z-index: 1;
+            z-index: 2;
         }
 
         /* Pulsating detection overlay */
@@ -93,7 +93,7 @@
             justify-content: center;
             background-color: rgba(184, 134, 11, 0.1);
             animation: pulseOverlay 2s infinite;
-            z-index: 2;
+            z-index: 3;
             pointer-events: none;
         }
 
@@ -182,7 +182,7 @@
                             </div>
                         </div>
 
-                        <img :src="`/video_feed/${id.split(',')[0]}/${id.split(',')[1]}`" class="w-full h-full object-cover absolute top-0 left-0" alt="Video Feed">
+                        <img :src="`/video_feed/${id.split(',')[0]}/${id.split(',')[1]}`" class="w-full h-full object-cover absolute top-0 left-0" style="z-index: 1;" alt="Video Feed">
 
                         <div v-if="activeViewports.includes(id)" class="detection-overlay">
                             <svg class="detection-eye" fill="currentColor" viewBox="0 0 24 24">
