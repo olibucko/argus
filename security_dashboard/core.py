@@ -1345,9 +1345,6 @@ class SecuritySystem:
             try:
                 current_time = time.time()
                 if current_time - last_metrics_update >= metrics_interval:
-                    # Update frame broker metrics
-                    self.frame_broker.update_backpressure_status()
-
                     # Collect memory metrics
                     memory_stats = self.memory_manager.get_global_stats()
                     record_metric("memory_usage_mb", memory_stats['total_memory_usage_mb'])

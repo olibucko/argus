@@ -97,13 +97,9 @@ class SharedFramePool:
         with self.lock:
             # Check memory limit
             if self.current_memory_bytes + frame_size > self.max_memory_bytes:
-                logger.warning(f"Frame pool memory limit exceeded: {self.current_memory_bytes/1024/1024:.1f}MB")
-                # Try to cleanup old frames with 0 references
-                self._cleanup_orphaned_frames()
-
-                # Check again after cleanup
-                if self.current_memory_bytes + frame_size > self.max_memory_bytes:
-                    return None
+                logger.warning(f"Frame pool memory limit exceeded: {self.current_memory_bytes/1024/1024:.1f}MB. Dropping new frame.")
+                # With correct reference counting, _cleanup_orphaned_frames is not needed.
+                return None
 
             # Store frame with initial ref count of 1
             self.frames[frame_id] = {
@@ -200,20 +196,6 @@ class SharedFramePool:
 
                 logger.debug(f"Freed frame {frame_id[:8]}... ({frame_size/1024:.1f}KB), "
                            f"pool size: {self.current_memory_bytes/1024/1024:.1f}MB")
-
-    def _cleanup_orphaned_frames(self):
-        """Remove frames with 0 references (shouldn't happen, but safety check)."""
-        with self.lock:
-            orphaned = [fid for fid, data in self.frames.items() if data['ref_count'] <= 0]
-
-            for frame_id in orphaned:
-                frame_size = self.frames[frame_id]['size']
-                del self.frames[frame_id]
-                self.current_memory_bytes -= frame_size
-                logger.warning(f"Cleaned up orphaned frame {frame_id[:8]}...")
-
-            if orphaned:
-                logger.info(f"Cleaned up {len(orphaned)} orphaned frames")
 
     def get_stats(self) -> Dict:
         """Get pool statistics."""
