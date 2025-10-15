@@ -14,27 +14,7 @@ def main():
     # 2. Validate camera configuration
     if not config.get('cameras') or len(config['cameras']) == 0:
         print("[CRITICAL ERROR] No cameras configured in config.json")
-        print("Please add camera configuration. Example:")
-        print("""
-        "cameras": [
-            {
-                "camera_id": 0,
-                "name": "Front Door",
-                "width": 1280,
-                "height": 720,
-                "fps": 30,
-                "enabled": true
-            },
-            {
-                "camera_id": "rtsp://192.168.1.100/stream",
-                "name": "Back Yard",
-                "width": 1920,
-                "height": 1080,
-                "fps": 25,
-                "enabled": true
-            }
-        ]
-        """)
+        print("Please add camera configuration. See GitHub for example configuration.")
         return
 
     # 3. Initialize application

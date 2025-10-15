@@ -23,8 +23,6 @@ class FrameMetrics:
     frames_received: int = 0
     frames_processed: int = 0
     frames_dropped: int = 0
-    avg_processing_time: float = 0.0
-    queue_depth: int = 0
     memory_usage_mb: float = 0.0
     last_update: float = field(default_factory=time.time)
 
@@ -54,9 +52,8 @@ class FrameBroker:
     - Comprehensive metrics collection
     """
 
-    def __init__(self, max_memory_mb: int = 512, max_queue_depth: int = 100, memory_manager=None):
+    def __init__(self, max_memory_mb: int = 512, memory_manager=None):
         self.max_memory_bytes = max_memory_mb * 1024 * 1024
-        self.max_queue_depth = max_queue_depth
         self.memory_manager = memory_manager
 
         # Camera state tracking
@@ -70,16 +67,6 @@ class FrameBroker:
         # Performance tracking
         self.frame_metrics: Dict[str, FrameMetrics] = defaultdict(FrameMetrics)
         self.global_metrics = FrameMetrics()
-
-        # Backpressure control
-        self.backpressure_active = False
-        self.last_backpressure_check = time.time()
-        self.backpressure_check_interval = 1.0  # seconds
-
-        # Performance tuning
-        self.min_fps_reduction = 0.5  # Don't reduce below 50% of base FPS
-        self.backpressure_threshold = 0.8  # Trigger at 80% of limits
-        self.recovery_threshold = 0.6  # Recover at 60% of limits
 
         logger.info(f"FrameBroker initialized with {max_memory_mb}MB memory limit")
 
@@ -154,18 +141,9 @@ class FrameBroker:
 
     def _should_process_frame(self, camera_name: str, timestamp: float) -> bool:
         """Determine if frame should be processed based on adaptive FPS."""
-        with self.camera_lock:
-            camera_state = self.cameras[camera_name]
-
-            # For the first frame, always accept it
-            if camera_state.last_frame_time == 0.0:
-                camera_state.last_frame_time = timestamp
-                return True
-
-            # No rate limiting - camera loop already controls FPS via sleep intervals
-            # Camera manager ensures frames arrive at correct intervals (40ms for 25 FPS)
-            # Accept all frames - the camera loop timing is the authoritative rate control
-            return True
+        # No rate limiting - camera loop already controls FPS via sleep intervals.
+        # The CameraManager loop is the authoritative rate controller.
+        return True
 
     def _distribute_frame(self, camera_name: str, frame: np.ndarray, timestamp: float) -> None:
         """Distribute frame to all subscribers for this camera.
@@ -224,83 +202,6 @@ class FrameBroker:
                 if camera_state.total_frames % 100 == 0:
                     logger.info(f"Updated {camera_name} timestamp: {old_time:.3f} -> {timestamp:.3f} (delta: {timestamp-old_time:.4f}s)")
 
-    def _handle_memory_pressure(self, required_bytes: int) -> bool:
-        """Handle memory pressure by reducing frame rates and coordinating with memory manager."""
-        if not self.backpressure_active:
-            self._activate_backpressure()
-
-        # Try to handle memory pressure through global memory manager
-        if self.memory_manager:
-            success = self.memory_manager.handle_memory_pressure()
-            if success:
-                return True
-
-        # If still under critical pressure, drop frame
-        return False
-
-    def _activate_backpressure(self) -> None:
-        """Activate backpressure by reducing frame rates."""
-        if self.backpressure_active:
-            return
-
-        self.backpressure_active = True
-        logger.warning("Activating backpressure - reducing frame rates")
-
-        with self.camera_lock:
-            for camera_name, camera_state in self.cameras.items():
-                # Reduce FPS more aggressively for non-priority cameras
-                if camera_name in self.priority_cameras:
-                    reduction_factor = 0.8  # 20% reduction for priority cameras
-                else:
-                    reduction_factor = 0.6  # 40% reduction for normal cameras
-
-                new_fps = max(
-                    camera_state.base_fps * self.min_fps_reduction,
-                    camera_state.base_fps * reduction_factor
-                )
-
-                camera_state.current_fps = new_fps
-                camera_state.frame_interval = 1.0 / new_fps
-
-                logger.info(f"Reduced {camera_name} FPS: {camera_state.base_fps:.1f} -> {new_fps:.1f}")
-
-    def _deactivate_backpressure(self) -> None:
-        """Deactivate backpressure by restoring normal frame rates."""
-        if not self.backpressure_active:
-            return
-
-        self.backpressure_active = False
-        logger.info("Deactivating backpressure - restoring normal frame rates")
-
-        with self.camera_lock:
-            for camera_name, camera_state in self.cameras.items():
-                camera_state.current_fps = camera_state.base_fps
-                camera_state.frame_interval = 1.0 / camera_state.base_fps
-
-                logger.info(f"Restored {camera_name} FPS to {camera_state.base_fps:.1f}")
-
-    def update_backpressure_status(self) -> None:
-        """Check and update backpressure status based on current load."""
-        current_time = time.time()
-        if current_time - self.last_backpressure_check < self.backpressure_check_interval:
-            return
-
-        self.last_backpressure_check = current_time
-
-        # Calculate current load metrics from global memory manager
-        memory_pressure = self.memory_manager.get_memory_pressure_level() if self.memory_manager else 0.0
-
-        # Calculate average queue depth across all components
-        # This would need to be provided by subscribers
-        avg_queue_depth = 0  # Placeholder
-
-        total_pressure = max(memory_pressure, avg_queue_depth)
-
-        if not self.backpressure_active and total_pressure > self.backpressure_threshold:
-            self._activate_backpressure()
-        elif self.backpressure_active and total_pressure < self.recovery_threshold:
-            self._deactivate_backpressure()
-
     def get_camera_metrics(self, camera_name: str) -> Optional[FrameMetrics]:
         """Get metrics for a specific camera."""
         return self.frame_metrics.get(camera_name)
@@ -335,11 +236,6 @@ class FrameBroker:
                 }
 
         return status
-
-    def release_frame_memory(self, frame_size: int) -> None:
-        """Called when a frame is no longer needed to update memory tracking."""
-        # Memory is now managed by MemoryBoundedBuffers, not the frame broker
-        pass
 
     def shutdown(self) -> None:
         """Shutdown the frame broker and clean up resources."""

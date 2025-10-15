@@ -179,8 +179,7 @@ class CameraManager:
             if next_frame_time < current_time - target_interval:
                 next_frame_time = current_time
 
-            # Flush RTSP buffer to get the latest frame (prevents reading stale buffered frames)
-            # For RTSP streams, read and discard to ensure fresh frame
+            # For RTSP, read and discard to ensure fresh frame
             if isinstance(camera.config.camera_id, str) and camera.config.camera_id.startswith('rtsp'):
                 # Grab (don't decode) to flush buffer quickly
                 for _ in range(2):  # Flush 2 buffered frames for ~100ms freshness

@@ -1,11 +1,8 @@
 event_captures
 event_videos
 security_events.db
-__pycache__
-yoloyv5s.pt
-yolov5su.pt
 config.json
 console.txt
 .vscode
 venv
-
+__pycache__
