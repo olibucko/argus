@@ -81,6 +81,39 @@
             z-index: 1;
         }
 
+        /* Pulsating detection overlay */
+        .detection-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(184, 134, 11, 0.1);
+            animation: pulseOverlay 2s infinite;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .detection-eye {
+            width: 25%;
+            height: 25%;
+            max-width: 80px;
+            max-height: 80px;
+            color: rgba(255, 215, 0, 0.7);
+            filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.8));
+            animation: pulseEye 2s infinite;
+        }
+
+        @keyframes pulseOverlay {
+            50% { background-color: rgba(184, 134, 11, 0.25); }
+        }
+        @keyframes pulseEye {
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 25px rgba(255, 215, 0, 1)); }
+        }
+
         /* Teal accent gradient (peacock) */
         .peacock-gradient {
             background: linear-gradient(135deg, #008B8B 0%, #20B2AA 50%, #48D1CC 100%);
@@ -150,6 +183,12 @@
                         </div>
 
                         <img :src="`/video_feed/${id.split(',')[0]}/${id.split(',')[1]}`" class="w-full h-full object-cover absolute top-0 left-0" alt="Video Feed">
+
+                        <div v-if="activeViewports.includes(id)" class="detection-overlay">
+                            <svg class="detection-eye" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                            </svg>
+                        </div>
                     </div>
 
                 </div>
@@ -567,8 +606,7 @@
         });
 
         socket.on('new_alert', data => {
-            app.addAlert(data);
-            app.triggerViewportHighlight(data);
+            app.addAlert(data); // Only add to the log, do not trigger highlight
         });
 
         socket.on('viewport_config_updated', data => {

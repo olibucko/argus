@@ -138,7 +138,7 @@ def yolo_worker_process(input_queue: mp.Queue, output_queue: mp.Queue,
 
                 # Send results back
                 result = (task_id, viewport_id, detections, inference_time)
-                output_queue.put(result)
+                output_queue.put(result, timeout=0.5) # Add timeout to prevent blocking
 
                 # Log performance metrics periodically
                 if task_id % 50 == 0:
@@ -309,11 +309,9 @@ class YOLOProcessManager:
                 self.total_inferences += 1
                 self.total_inference_time += inference_time
 
-                # Cleanup shared memory for this task
-                self._cleanup_shared_memory(task_id)
-
-                # Clean up pending tasks
+                # Clean up pending tasks and shared
                 self.pending_tasks.pop(task_id, None)
+                self._cleanup_shared_memory(task_id)
 
                 results.append((viewport_id, detections, inference_time))
 

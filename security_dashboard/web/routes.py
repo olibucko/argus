@@ -158,7 +158,13 @@ def video_feed(row: int, col: int):
             if encoded_frame is not None:
                 if not first_frame_sent:
                     print(f"[VIDEO_FEED] First frame sent for viewport {viewport_id}")
-                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + encoded_frame + b'\r\n')
+                try:
+                    yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + encoded_frame + b'\r\n')
+                except (BrokenPipeError, ConnectionResetError):
+                    # Client disconnected, exit the generator cleanly
+                    print(f"[VIDEO_FEED] Client disconnected for viewport {viewport_id}")
+                    return
+
                 first_frame_sent = True
             elif not first_frame_sent and (time.time() - wait_start) < max_wait:
                 # Still waiting for first frame, don't give up yet

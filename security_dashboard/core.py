@@ -420,7 +420,13 @@ class AlertManager:
         timer.start()
         self.batch_timers[viewport_id] = timer
         
-        self.socketio.emit('detection_in_progress', {'row': viewport_id[0], 'col': viewport_id[1]}, namespace='/')
+        # Use application context when emitting from a background thread
+        if self.flask_app:
+            with self.flask_app.app_context():
+                self.socketio.emit('detection_in_progress', {'row': viewport_id[0], 'col': viewport_id[1]}, namespace='/')
+        else:
+            # Fallback for when app context is not available (e.g., in tests)
+            self.socketio.emit('detection_in_progress', {'row': viewport_id[0], 'col': viewport_id[1]}, namespace='/')
 
     def _take_screenshot(self, frame, timestamp, viewport_name):
         """Take a screenshot and return the path, or None if failed."""
@@ -525,10 +531,10 @@ class AlertManager:
         # IMPORTANT: Use application context when emitting from background thread
         if self.flask_app:
             with self.flask_app.app_context():
-                self.socketio.emit('new_alert', alert_to_emit, namespace='/', broadcast=True)
+                self.socketio.emit('new_alert', alert_to_emit, namespace='/')
                 logger.info(f"Emitted new_alert event for {primary_alert['viewport_name']} via Socket.IO")
         else:
-            self.socketio.emit('new_alert', alert_to_emit, namespace='/', broadcast=True)
+            self.socketio.emit('new_alert', alert_to_emit, namespace='/')
             logger.info(f"Emitted new_alert event for {primary_alert['viewport_name']} via Socket.IO (no app context)")
 
         # Alert sending logic during curfew hours: Telegram first, email as fallback
@@ -1000,7 +1006,7 @@ class Viewport:
 
         if should_run_yolo:
             try:
-                task_id = yolo_manager.submit_detection_task(self.id, frame.copy())
+                task_id = yolo_manager.submit_detection_task(self.id, frame)
             except Full:
                 pass # Drop frame if detection is backlogged
 
@@ -1426,7 +1432,7 @@ class SecuritySystem:
                             # Process the frame for motion detection
                             viewport.process_frame(frame_data, self.yolo_manager)
 
-                            processing_time = (time.time() - start_time) * 1000  # ms
+                            processing_time = (time.time() - start_time) * 1000
                             record_metric("processing_latency_ms", processing_time, {"viewport": f"{vp_id[0]},{vp_id[1]}"})
                     finally:
                         # FrameEntry handles releasing the reference if it is one
@@ -1527,11 +1533,13 @@ class SecuritySystem:
                 if not self.alert_manager.detection_enabled:
                     continue # Ignore event and wait for next alert.
 
+                # If the event doesn't have a frame, get the latest one from the display buffer.
+                # This is the "zero-copy" part - we retrieve the frame in the main process.
                 viewport_id = event['viewport_id']
-                # Get latest frame from display buffer
-                if viewport_id in self.display_buffers:
+                if event.get('frame') is None and viewport_id in self.display_buffers:
                     current_frame = self.display_buffers[viewport_id].get_latest_frame()
                     if current_frame is not None:
+                        logger.debug(f"Retrieved latest frame for event in viewport {viewport_id}")
                         event['frame'] = current_frame
 
                 # Process video recording and alerts
