@@ -8,3 +8,4 @@ venv
 __pycache__
 extract_report_data.py
 report_data.txt
+yolov5/
