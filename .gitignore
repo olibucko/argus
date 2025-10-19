@@ -6,3 +6,5 @@ console.txt
 .vscode
 venv
 __pycache__
+extract_report_data.py
+report_data.txt

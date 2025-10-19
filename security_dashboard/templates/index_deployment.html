@@ -555,7 +555,7 @@
             }
         });
 
-        // Register Socket.IO listeners immediately after Vue instance creation
+        // Register Socket.IO listeners
         socket.on('connect', () => {
             console.log('Socket.IO connected!');
         });
@@ -586,7 +586,8 @@
         });
 
         socket.on('new_alert', data => {
-            app.addAlert(data); // Only add to the log, do not trigger highlight
+            console.log('[SOCKET.IO] Received new_alert:', data);
+            app.addAlert(data);
         });
 
         socket.on('viewport_config_updated', data => {

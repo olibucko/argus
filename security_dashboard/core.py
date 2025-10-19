@@ -527,15 +527,14 @@ class AlertManager:
             'col': viewport_id[1],
             'video_path': video_path  # Full video for frontend
         }
-        # Emit to all connected clients (broadcast=True)
-        # IMPORTANT: Use application context when emitting from background thread
+
         if self.flask_app:
             with self.flask_app.app_context():
                 self.socketio.emit('new_alert', alert_to_emit, namespace='/')
-                logger.info(f"Emitted new_alert event for {primary_alert['viewport_name']} via Socket.IO")
+                print(f"[SOCKET.IO] Emitted new_alert: {alert_to_emit}")
         else:
             self.socketio.emit('new_alert', alert_to_emit, namespace='/')
-            logger.info(f"Emitted new_alert event for {primary_alert['viewport_name']} via Socket.IO (no app context)")
+            print(f"[SOCKET.IO] NO CONTEXT Emitted new_alert: {alert_to_emit}")
 
         # Alert sending logic during curfew hours: Telegram first, email as fallback
         is_curfew = self.is_curfew_hours()
@@ -1452,11 +1451,26 @@ class SecuritySystem:
         results_processed = 0
         last_log_time = time.time()
 
+        # DATA COLLECTION FOR REPORT
+        inference_times = []
+
         while self.running:
             try:
                 # Get results from YOLO process (non-blocking)
                 results = self.yolo_manager.get_detection_results(max_results=10)
-                
+
+                # DATA COLLECTION FOR REPORT
+                for viewport_id, detections, inference_time in results:
+                    inference_times.append(inference_time)
+                    # Log every 50th inference
+                    if len(inference_times) % 50 == 0:
+                        avg = sum(inference_times) / len(inference_times)
+                        p95 = sorted(inference_times)[int(len(inference_times) * 0.95)]
+
+                        print(f"[REPORT] Inference Stats (n={len(inference_times)}):+  Avg: {avg*1000:.1f}ms, 95th: {p95*1000:.1f}ms")  
+
+                #END DATA COLLECTION
+                                
                 if not results:
                     time.sleep(0.01)  # Small delay if no results
                     continue

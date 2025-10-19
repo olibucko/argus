@@ -1,9 +1,6 @@
 """
-Frame Broker - Centralized frame distribution with backpressure control.
+Frame Broker - Centralized frame distribution with memory-awareness.
 
-This module replaces the simple queue-based frame passing with an intelligent
-broker that can adapt frame rates and manage memory pressure to prevent
-frame drops and system overload.
 """
 
 import time
@@ -43,13 +40,7 @@ class CameraState:
 
 class FrameBroker:
     """
-    Centralized frame distribution system with intelligent backpressure control.
-
-    Features:
-    - Adaptive frame rate reduction under load
-    - Priority-based frame processing
-    - Memory pressure management
-    - Comprehensive metrics collection
+    Centralized frame distribution.
     """
 
     def __init__(self, max_memory_mb: int = 512, memory_manager=None):
@@ -101,7 +92,7 @@ class FrameBroker:
         Submit a frame for distribution.
 
         Returns:
-            bool: True if frame was accepted, False if dropped due to backpressure
+            bool: True if frame was accepted, False if dropped
         """
         # Check if this camera is registered
         with self.camera_lock:
