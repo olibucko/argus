@@ -289,8 +289,12 @@ class AlertManager:
     def handle_alert_event(self, event: Dict) -> None:
         """Public entry point to handle a new detection event."""
         if not self.detection_enabled: return
-        
+
         viewport_id = event['viewport_id']
+
+        # Signal the frontend on every detection so the highlight stays active
+        self.socketio.emit('detection_in_progress', {'row': viewport_id[0], 'col': viewport_id[1]}, namespace='/')
+
         with self.alert_lock:
             if viewport_id in self.batch_timers and self.batch_timers[viewport_id].is_alive():
                 self.pending_alerts[viewport_id].append(event)
@@ -316,8 +320,6 @@ class AlertManager:
         timer.daemon = True
         timer.start()
         self.batch_timers[viewport_id] = timer
-        
-        self.socketio.emit('detection_in_progress', {'row': viewport_id[0], 'col': viewport_id[1]}, namespace='/')
 
     def _take_screenshot(self, frame: np.ndarray, timestamp: datetime, name: str) -> Optional[str]:
         """Saves a screenshot and returns the path."""
@@ -790,17 +792,19 @@ class SecuritySystem:
 
     def _jpeg_encoding_worker(self) -> None:
         """Worker thread to pre-encode frames to JPEG for web streaming."""
+        target_fps = self.config.get('system', {}).get('dashboard_fps', 12)
+        encode_params = [cv2.IMWRITE_JPEG_QUALITY, 55]
         while self.running:
             try:
                 start_time = time.time()
                 for vp_id, buffer in self.display_buffers.items():
                     if (frame := buffer.get_latest_frame()) is not None:
-                        _, enc_buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 60, cv2.IMWRITE_JPEG_OPTIMIZE, 1])
+                        _, enc_buffer = cv2.imencode('.jpg', frame, encode_params)
                         with self.encoding_lock:
                             self.encoded_frames[vp_id] = enc_buffer.tobytes()
-                
+
                 elapsed = time.time() - start_time
-                time.sleep(max(0, (1.0 / 25) - elapsed))
+                time.sleep(max(0, (1.0 / target_fps) - elapsed))
             except Exception as e:
                 logger.error(f"JPEG encoding worker error: {e}")
                 time.sleep(0.1)

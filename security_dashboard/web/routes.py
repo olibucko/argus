@@ -178,7 +178,7 @@ def video_feed(row: int, col: int):
                 logger.debug(f"Final check - available frames: {list(security_system.encoded_frames.keys())}")
                 return  # Exit generator to close connection
 
-            eventlet.sleep(1/20)  # Use eventlet.sleep to yield to other green threads
+            eventlet.sleep(1/12)  # Match dashboard_fps encoding rate
 
     return Response(generate_frames((row, col)), mimetype='multipart/x-mixed-replace; boundary=frame')
 
