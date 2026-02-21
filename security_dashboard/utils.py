@@ -59,16 +59,34 @@ def load_config() -> dict:
             config = json.load(f)
         return _overlay_secrets(config)
 
+# Fields that are managed by .env and must not be written back to config.json.
+_SECRET_FIELDS = {"telegram_bot_token", "telegram_chat_ids", "email_password", "sender_email", "recipient_list"}
+
+def _strip_secrets(config_data: dict) -> dict:
+    """Return a deep copy of config with secret fields reset to safe defaults."""
+    import copy
+    clean = copy.deepcopy(config_data)
+    am = clean.get("alert_manager", {})
+    for field in _SECRET_FIELDS:
+        if field in am:
+            am[field] = [] if isinstance(am[field], list) else ""
+    for camera in clean.get("cameras", []):
+        if os.getenv(f"CAMERA_{clean['cameras'].index(camera) + 1}_URL"):
+            camera["camera_id"] = ""
+    return clean
+
 def save_config(config_data: dict) -> None:
     """
     Save the configuration data to config.json in a thread-safe manner.
+    Secret values sourced from .env are stripped before writing.
 
     Args:
         config_data (dict): The configuration data to save.
     """
+    clean_data = _strip_secrets(config_data)
     with config_lock:
         with open(CONFIG_FILE, 'w') as f:
-            json.dump(config_data, f, indent=2)
+            json.dump(clean_data, f, indent=2)
     logger.info("Configuration saved to config.json")
 
 def init_db() -> None:
