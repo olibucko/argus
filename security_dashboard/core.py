@@ -297,6 +297,11 @@ class AlertManager:
 
         with self.alert_lock:
             if viewport_id in self.batch_timers and self.batch_timers[viewport_id].is_alive():
+                # Capture additional screenshots for the batch (up to 5 total)
+                batch_screenshots = sum(1 for e in self.pending_alerts[viewport_id] if e.get('screenshot_path'))
+                if batch_screenshots < 5 and event.get('frame') is not None:
+                    timestamp = datetime.fromtimestamp(event['timestamp'])
+                    event['screenshot_path'] = self._take_screenshot(event['frame'], timestamp, event['viewport_name'])
                 self.pending_alerts[viewport_id].append(event)
                 if self.video_recorder.is_recording(viewport_id):
                     self.video_recorder.update_activity(viewport_id)
@@ -322,10 +327,14 @@ class AlertManager:
         self.batch_timers[viewport_id] = timer
 
     def _take_screenshot(self, frame: np.ndarray, timestamp: datetime, name: str) -> Optional[str]:
-        """Saves a screenshot and returns the path."""
+        """Saves a screenshot scaled to 720p max height for fast mobile delivery."""
         try:
+            h, w = frame.shape[:2]
+            if h > 720:
+                scale = 720 / h
+                frame = cv2.resize(frame, (int(w * scale), 720), interpolation=cv2.INTER_AREA)
             path = os.path.join("event_captures", f"{timestamp.strftime('%Y%m%d_%H%M%S')}_{name.replace(' ', '_')}.jpg")
-            if cv2.imwrite(path, frame):
+            if cv2.imwrite(path, frame, [cv2.IMWRITE_JPEG_QUALITY, 80]):
                 logger.info(f"Screenshot saved: {path}")
                 return path
             logger.error(f"Failed to save screenshot: {path}")
@@ -385,17 +394,16 @@ class AlertManager:
     def _dispatch_notifications(self, primary_alert: Dict, all_alerts: List[Dict]) -> None:
         """Handles the logic for sending email and/or Telegram notifications."""
         video_path = primary_alert.get('video_path')
-        screenshot_path = primary_alert.get('screenshot_path')
-        
+        screenshot_paths = [a['screenshot_path'] for a in all_alerts if a.get('screenshot_path')]
+
         telegram_sent = False
         if self.telegram_enabled:
-            clip_path = self._extract_video_clip(video_path) if video_path else None
             message = self._prepare_telegram_message(all_alerts)
-            telegram_sent = self._send_telegram_alert(message, screenshot_path, clip_path)
+            telegram_sent = self._send_telegram_alert(message, screenshot_paths)
 
         if self.email_enabled and (not telegram_sent and self.config.email_as_fallback):
             subject = f"Security Alert - {primary_alert['viewport_name']}"
-            content, attachments = self._prepare_email_content(all_alerts, screenshot_path, video_path)
+            content, attachments = self._prepare_email_content(all_alerts, screenshot_paths[0] if screenshot_paths else None, video_path)
             self._send_email(subject, content, attachments)
 
     def _prepare_email_content(self, alerts: List[Dict], screen_path: Optional[str], vid_path: Optional[str]) -> Tuple[str, List[str]]:
@@ -453,34 +461,44 @@ class AlertManager:
         ts = datetime.fromtimestamp(primary['timestamp'])
         return f"🚨 *SECURITY ALERT*\n\n*Camera:* {primary['viewport_name']}\n*Time:* {ts.strftime('%Y-%m-%d %H:%M:%S')}\n*Confidence:* {primary['confidence']}%"
 
-    def _send_telegram_alert(self, message: str, screenshot_path: Optional[str], video_path: Optional[str]) -> bool:
-        """Sends a Telegram alert synchronously (within the dispatch thread)."""
+    def _send_telegram_alert(self, message: str, screenshot_paths: Optional[List[str]] = None) -> bool:
+        """Sends a Telegram alert with optional screenshot group."""
         if not self.telegram_enabled or not self.telegram_bot: return False
-        
+
         try:
-            logger.info("Sending Telegram alert...")
+            logger.info(f"Sending Telegram alert with {len(screenshot_paths or [])} screenshot(s)...")
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            loop.run_until_complete(self._async_send_telegram(message, screenshot_path, video_path))
-            if video_path and video_path.endswith('_clip.mp4'):
-                try: os.remove(video_path) 
-                except Exception: pass
+            loop.run_until_complete(self._async_send_telegram(message, screenshot_paths or []))
             return True
         except Exception as e:
             logger.error(f"Telegram alert failed: {e}")
             return False
 
-    async def _async_send_telegram(self, message: str, screen_path: Optional[str], vid_path: Optional[str]) -> None:
-        """Asynchronously sends the Telegram message with media."""
+    async def _async_send_telegram(self, message: str, screenshot_paths: List[str]) -> None:
+        """Sends the Telegram message with a media group of screenshots."""
         if not self.telegram_bot: return
-        
+
+        # Filter to paths that actually exist
+        valid_paths = [p for p in screenshot_paths if p and os.path.exists(p)]
+
         for chat_id in self.config.telegram_chat_ids:
             try:
-                media_path = vid_path or screen_path
-                if media_path:
-                    with open(media_path, 'rb') as f:
-                        if vid_path: await self.telegram_bot.send_video(chat_id=chat_id, video=f, caption=message, parse_mode='Markdown')
-                        else: await self.telegram_bot.send_photo(chat_id=chat_id, photo=f, caption=message, parse_mode='Markdown')
+                if len(valid_paths) > 1:
+                    from telegram import InputMediaPhoto
+                    media = []
+                    for i, path in enumerate(valid_paths):
+                        with open(path, 'rb') as f:
+                            photo_data = f.read()
+                        media.append(InputMediaPhoto(
+                            media=photo_data,
+                            caption=message if i == 0 else None,
+                            parse_mode='Markdown' if i == 0 else None
+                        ))
+                    await self.telegram_bot.send_media_group(chat_id=chat_id, media=media)
+                elif len(valid_paths) == 1:
+                    with open(valid_paths[0], 'rb') as f:
+                        await self.telegram_bot.send_photo(chat_id=chat_id, photo=f, caption=message, parse_mode='Markdown')
                 else:
                     await self.telegram_bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
                 logger.info(f"Telegram alert sent to chat {chat_id}.")

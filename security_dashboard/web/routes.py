@@ -371,8 +371,8 @@ def test_telegram():
         test_message += f"If you received this message, your Telegram configuration is working correctly!\n\n"
         test_message += f"_Argus Security System_"
 
-        # Send test message
-        success = alert_manager._send_telegram_alert(test_message, screenshot_path=None)
+        # Send test message (no screenshots)
+        success = alert_manager._send_telegram_alert(test_message)
 
         if success:
             return jsonify({
