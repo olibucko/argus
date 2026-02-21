@@ -1,0 +1,57 @@
+{
+  "system": {
+    "model_path": "yolov5s.pt",
+    "yolo_device": "cpu",
+    "max_fps": 25,
+    "memory_limit_mb": 2048
+  },
+  "video_recording": {
+    "pre_event_seconds": 5,
+    "post_event_seconds": 5,
+    "max_clip_duration_seconds": 30,
+    "codec": "avc1"
+  },
+  "alert_manager": {
+    "curfew_start": "05:00",
+    "curfew_end": "17:00",
+    "cooldown_period_seconds": 30,
+    "batch_window_seconds": 5,
+    "telegram_bot_token": "",
+    "telegram_chat_ids": [],
+    "telegram_enabled": false,
+    "email_as_fallback": true,
+    "recipient_list": [],
+    "sender_email": "",
+    "sender_name": "Argus Security",
+    "email_password": ""
+  },
+  "cameras": [
+    {
+      "camera_id": "",
+      "camera_name": "Camera 1",
+      "width": 1920,
+      "height": 1080,
+      "fps": 25,
+      "enabled": true,
+      "sensitivity": 0.85,
+      "min_confidence": 0.65,
+      "yolo_interval": 10,
+      "motion_aggressiveness": 10,
+      "frame_skip": 1,
+      "min_object_size": [30, 30],
+      "motion_threshold": 30,
+      "scale_factor": 0.4,
+      "name": "Main View"
+    }
+  ],
+  "viewport_defaults": {
+    "sensitivity": 0.8,
+    "min_confidence": 0.55,
+    "yolo_interval": 10,
+    "motion_aggressiveness": 10,
+    "frame_skip": 1,
+    "min_object_size": [30, 30],
+    "motion_threshold": 30,
+    "scale_factor": 0.5
+  }
+}

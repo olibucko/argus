@@ -1,0 +1,49 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+venv/
+
+# Data & model weights
+*.db
+*.pt
+*.onnx
+event_captures/
+event_videos/
+
+# Binaries
+*.dll
+*.so
+*.dylib
+
+# Logs
+*.log
+console.txt
+
+# IDE & editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Claude Code
+.claude/
+
+# Project-specific
+config.json
+extract_report_data.py
+report_data.txt
+yolov5/
+GEMINI.md
