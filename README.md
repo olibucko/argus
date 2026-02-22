@@ -2,7 +2,7 @@
 
 Argus is a real-time security monitoring platform that combines multi-camera RTSP ingestion with AI-powered person detection, motion-gated inference, and automated alerting. Built for continuous, unattended operation in environments where reliable detection and fast notification matter — remote sites, industrial yards, and perimeter monitoring.
 
-![Argus Dashboard Demo](demo.gif)
+![Argus Dashboard Demo](argus_demo.gif)
 
 ## Key Features
 
