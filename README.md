@@ -1,5 +1,4 @@
-# Argus — Real-Time Multi-Camera Surveillance System
-
+# Argus
 Argus is a real-time security monitoring platform that processes multiple RTSP camera feeds with motion detection, YOLO person detection, and automated user alerting. Built for continuous, unattended operation.
 
 ![Argus Dashboard Demo](argus_demo.gif)
@@ -16,15 +15,7 @@ Argus is a real-time security monitoring platform that processes multiple RTSP c
 
 ## Architecture
 
-DIAGRAM HERE
-
-## Tech Stack
-| Computer Vision | OpenCV, YOLOv5 (Ultralytics) |
-| Deep Learning | PyTorch (CUDA 12.1 supported) |
-| Web Server | Flask, Flask-SocketIO, Eventlet |
-| Notifications | python-telegram-bot, yagmail |
-| Database | SQLite |
-| Concurrency | Threading, multiprocessing with shared memory |
+![Argus Dashboard Demo](argus_architecture.png)
 
 ## Project Structure
 
@@ -75,7 +66,7 @@ pip install -r requirements.txt
    TELEGRAM_BOT_TOKEN=your_token_here
    ```
 
-3. Edit `config.json` to tune detection parameters per camera — sensitivity, confidence thresholds, motion aggressiveness, YOLO interval, and curfew hours.
+3. Edit `config.json` to tune detection parameters per camera including: sensitivity, confidence thresholds, motion aggressiveness, YOLO detection interval, and curfew hours.
 
 ### Running
 
@@ -83,7 +74,7 @@ pip install -r requirements.txt
 python -m security_dashboard.app
 ```
 
-The dashboard will be available at `http://localhost:5000`.
+The dashboard will be available at `http://localhost:5000`. Most settings initially configured in config.json can now be adjusted from the live web dashboard.
 
 ## License
 
